@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Backend Build & Deploy') {
+            agent {
+                docker { image 'python:3.9' }
+            }
+            steps {
+                echo 'Building Backend...'
+                sh '''
+                    cd backend
+                    pip install -r requirements.txt
+                    python manage.py test
+                    docker build -t rajesh07S/backend:latest .
+                    docker push rajesh07S/backend:latest
+                '''
+            }
+        }
+
+        stage('Frontend Build & Deploy') {
+            agent {
+                docker { image 'node:18' }
+            }
+            steps {
+                echo 'Building Frontend...'
+                sh '''
+                    cd frontend
+                    npm install
+                    npm run build
+                    docker build -t rajesh07S/frontend:latest .
+                    docker push rajesh07S/frontend:latest
+                '''
+            }
+        }
+
+        stage('Database Setup') {
+            agent {
+                docker { image 'postgres:14' }
+            }
+            steps {
+                echo 'Setting up Database...'
+                sh '''
+                    docker run -d --name mydb \
+                        -e POSTGRES_USER=admin \
+                        -e POSTGRES_PASSWORD=secret \
+                        -e POSTGRES_DB=myapp \
+                        postgres:14
+                '''
+            }
+        }
+
+        stage('Integration Test') {
+            agent any
+            steps {
+                echo 'Running Integration Tests...'
+                sh '''
+                    # Example: curl frontend endpoint that talks to backend & DB
+                    curl http://localhost:3000/health
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Three-tier pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
+
